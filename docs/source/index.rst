@@ -30,10 +30,10 @@ a target technology.
 .. note::
    This repository hosts the backend of the BESSER platform: the B-UML metamodel,
    generators, utilities, and services that the web modeling editor consumes.
-   The editor's frontend is maintained in the `BESSER_WME_standalone <https://github.com/BESSER-PEARL/BESSER_WME_standalone>`_
-   project, included here only as a submodule for local deployments.
+   The editor's frontend is maintained in the `BESSER-WEB-MODELING-EDITOR <https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR>`_
+   project, included here only as a submodule (``besser/utilities/web_modeling_editor/frontend``) for local deployments.
 
-If you would like to contribute, the :doc:`contributing` section now includes a comprehensive onboarding guide
+If you would like to contribute, the :doc:`contributing/index` section now includes a comprehensive onboarding guide
 for humans and automation alike.
 
 Contents

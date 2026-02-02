@@ -121,11 +121,11 @@ overview of how the pieces fit together.
 ### Related projects
 
 The web modeling editor frontend lives in the
-[BESSER_WME_standalone](https://github.com/BESSER-PEARL/BESSER_WME_standalone)
+[BESSER-WEB-MODELING-EDITOR](https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR)
 repository (included here as a submodule under
-`besser/utilities/web_modeling_editor/`). Contribute UI changes or new widgets
-there. This repository focuses on the backend API, metamodel, generators, and
-utilities that the editor consumes.
+`besser/utilities/web_modeling_editor/frontend`). Contribute UI changes or new
+widgets there. This repository focuses on the backend API, metamodel,
+generators, and utilities that the editor consumes.
 
 ---
 

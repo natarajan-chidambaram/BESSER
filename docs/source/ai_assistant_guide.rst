@@ -6,10 +6,6 @@ code-generation agents) should collaborate with the BESSER project. Following
 these practices keeps generated contributions aligned with community
 expectations and reduces maintenance overhead.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 Scope and Responsibilities
 --------------------------
 
@@ -54,11 +50,11 @@ Repository Boundaries
   Editor and the standalone SDK. Changes should focus on the B-UML metamodel,
   generators, utilities, and backend services.
 * The web editor frontend lives in
-  `BESSER_WME_standalone <https://github.com/BESSER-PEARL/BESSER_WME_standalone>`_.
+  `BESSER-WEB-MODELING-EDITOR <https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR>`_.
   Only modify the vendored submodule under
-  ``besser/utilities/web_modeling_editor`` when explicitly instructed.
+  ``besser/utilities/web_modeling_editor/frontend`` when explicitly instructed.
 * When adding backend capabilities for the editor, update corresponding
-  documentation (``docs/source/web_modeling_editor/``) and cross-reference
+  documentation (``docs/source/web_editor.rst``) and cross-reference
   contributor guidance.
 
 Quality Assurance

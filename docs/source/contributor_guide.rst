@@ -1,14 +1,10 @@
 Contributor Guide
 =================
 
-This guide complements :doc:`contributing` and the root-level
+This guide complements :doc:`contributing/index` and the root-level
 ``CONTRIBUTING.md`` file. It provides a deeper walkthrough of the repository
 layout, development workflows, and quality expectations so that new
 contributors can become productive quickly.
-
-.. contents:: On this page
-   :local:
-   :depth: 2
 
 Project Overview
 ----------------
@@ -61,8 +57,8 @@ Repository Layout
     verifying generator output or end-to-end flows.
 
 Frontend assets for the BESSER Web Modeling Editor live in the separate
-`BESSER_WME_standalone <https://github.com/BESSER-PEARL/BESSER_WME_standalone>`_
-repository (vendored here as the ``besser/utilities/web_modeling_editor``
+`BESSER-WEB-MODELING-EDITOR <https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR>`_
+repository (vendored here as the ``besser/utilities/web_modeling_editor/frontend``
 submodule). Contribute UI updates there; this repository focuses on the backend
 APIs, metamodel, generators, and utilities consumed by that frontend.
 
@@ -78,6 +74,29 @@ Getting Started
 5. Run an example, such as ``python tests/BUML/metamodel/structural/library/library.py``,
    to validate your setup.
 
+Web Modeling Editor Frontend Setup
+----------------------------------
+
+If you want to run or extend the Web Modeling Editor (WME) frontend, use the
+WME repository directly or the git submodule inside this repo.
+Prerequisites: Node.js 20+ and npm.
+
+**Using the submodule:**
+
+1. Initialize the submodule: ``git submodule update --init --recursive``.
+2. Install dependencies: ``cd besser/utilities/web_modeling_editor/frontend && npm install``.
+3. Start the backend API (from the repo root): ``python besser/utilities/web_modeling_editor/backend/backend.py``.
+4. Start the webapp: ``npm run start:webapp`` (still in the frontend folder).
+
+The webapp runs on http://localhost:8080 and expects the backend at
+http://localhost:9000/besser_api in development mode.
+
+**Using the standalone WME repo:**
+
+1. Clone `BESSER-WEB-MODELING-EDITOR <https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR>`_.
+2. Run ``npm install`` and ``npm run start:webapp``.
+3. Start the BESSER backend as above if you need live API integration.
+
 Development Workflow
 --------------------
 
@@ -88,6 +107,21 @@ Development Workflow
 * Update the documentation whenever you introduce new behaviors, options, or
   workflows.
 * Run automated checks locally before pushing (tests, linting, docs build).
+
+Coordinating Changes Across BESSER and WME
+------------------------------------------
+
+If a change impacts both the BESSER backend and the WME frontend (for example,
+adding a new DSL with graphical notation):
+
+1. Implement and commit the WME changes in the WME repository.
+2. Implement and commit the BESSER changes in this repository.
+3. Update the git submodule pointer in this repo to the new WME commit.
+4. Link the two pull requests so reviewers can merge them in the correct order.
+
+For the WME-side steps, see the WME contributor guide:
+`Adding a New Diagram Type <https://besser.readthedocs.io/projects/besser-web-modeling-editor/en/latest/contributing/new-diagram-guide/index.html>`_.
+For the full cross-repo checklist, see :doc:`contributing/diagram_dsl_workflow`.
 
 Testing and Quality Checks
 --------------------------
