@@ -41,3 +41,4 @@ besser/utilities/web_modeling_editor/backend/feedback_data
 # pylint
 .pylintrc
 
+generated/*

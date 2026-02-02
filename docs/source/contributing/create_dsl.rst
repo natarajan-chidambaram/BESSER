@@ -4,6 +4,9 @@ Guide: Add a New DSL
 This guide covers the full lifecycle for extending B-UML with a new domain-specific branch and plugging it into the web
 modeling editor.
 
+For a full cross-repo checklist (editor package + webapp + backend), see
+:doc:`diagram_dsl_workflow`.
+
 1. Design the Metamodel
 -----------------------
 
@@ -28,12 +31,26 @@ modeling editor.
 4. Integrate with the Web Modeling Editor
 -----------------------------------------
 
-* Frontend: add the visual palette elements, properties panels, and canvas behaviors in
-  ``besser/utilities/web_modeling_editor/frontend``. Follow the existing component patterns (React/TypeScript) and add
-  Storybook demos if available.
-* Backend: expose REST/WS endpoints, validation routes, and persistence logic under
+The Web Modeling Editor (WME) frontend lives in the separate ``BESSER-WEB-MODELING-EDITOR`` repository and is vendored
+here as a git submodule at ``besser/utilities/web_modeling_editor/frontend``. Frontend changes should be committed in
+that repository, then the submodule pointer updated in BESSER.
+
+* Decide the scope:
+
+  - **Enable an existing diagram type** (already implemented in the editor package): wire it into the webapp project
+    model, sidebar, and import/export flows. See
+    ``packages/webapp/src/main/components/project/ADDING_NEW_DIAGRAM_TYPE.md`` in the WME repo.
+  - **Add a brand-new diagram/DSL**: extend the editor package first (diagram type, element types, renderers, palette
+    previews, translations, property editors), then wire it into the webapp.
+* Frontend (WME repo): update the editor package and webapp to expose the new diagram type and UI affordances. Follow
+  existing React/TypeScript patterns and add Storybook demos if available.
+* Backend (BESSER): expose REST/WS endpoints, validation routes, and persistence logic under
   ``besser/utilities/web_modeling_editor/backend``. Align FastAPI/Flask schemas with the BUML definitions.
-* Sync contracts: update shared type definitions so frontend and backend stay compatible (e.g., OpenAPI schemas, TS types).
+* Sync contracts: keep JSON element/relationship types, OpenAPI schemas, and TypeScript types consistent across the two
+  repos so import/export and validation remain stable.
+* Reference guide: `WME - Adding a New Diagram Type <https://besser.readthedocs.io/projects/besser-web-modeling-editor/en/latest/contributing/new-diagram-guide/index.html>`_.
+* Sync the repos: after the WME change merges, update the submodule SHA in this repo and reference the WME commit/PR in
+  your BESSER pull request.
 
 5. Update Documentation and Examples
 ------------------------------------
@@ -42,4 +59,13 @@ modeling editor.
 * Provide at least one runnable sample in ``docs/source/examples`` showing how to model with the new DSL and, if
   relevant, how generators consume it.
 * Highlight migration advice or compatibility notes so existing users know how the change affects their projects.
+
+6. Verify end-to-end behavior
+-----------------------------
+
+* Run the WME backend locally (``python besser/utilities/web_modeling_editor/backend/backend.py``; defaults to port
+  9000).
+* Run the WME frontend locally (``npm run start:webapp`` in the WME repo or submodule) and confirm the new palette
+  items, properties, and serialization work against the backend.
+* Run automated checks: ``python -m pytest`` for BESSER; ``npm run lint`` and ``npm run build:webapp`` for WME.
 

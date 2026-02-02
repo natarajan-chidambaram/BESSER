@@ -87,7 +87,7 @@ class WebAppGenerator(GeneratorInterface):
         docker_compose_template = env.get_template('docker-compose.yml.j2')
         docker_compose_path = os.path.join(self.output_dir, 'docker-compose.yml')
         with open(docker_compose_path, 'w') as f:
-            f.write(docker_compose_template.render(agent_model=self.agent_model))
+            f.write(docker_compose_template.render(agent_model=self.agent_model, name=self.model.name))
 
         # Generate frontend Dockerfile
         frontend_dockerfile_template = env.get_template('frontend.Dockerfile.j2')

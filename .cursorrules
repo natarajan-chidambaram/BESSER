@@ -3,7 +3,7 @@
 These instructions tailor AI assistant suggestions to the structure of the `BESSER`
 repository, which implements the **backend** for the BESSER Web Modeling Editor
 and the core B-UML SDK. The web editor's frontend lives in
-[`BESSER_WME_standalone`](https://github.com/BESSER-PEARL/BESSER_WME_standalone);
+[`BESSER-WEB-MODELING-EDITOR`](https://github.com/BESSER-PEARL/BESSER-WEB-MODELING-EDITOR);
 avoid authoring UI code here unless you are touching the embedded frontend submodule
 under `besser/utilities/web_modeling_editor/frontend`.
 
@@ -37,7 +37,7 @@ under `besser/utilities/web_modeling_editor/frontend`.
 - Favor small, composable functions; promote reusable logic to `besser.utilities`.
 
 ## TypeScript / Frontend Touchpoints
-- TypeScript should rarely appear in this repository. If you must edit the frontend submodule under `besser/utilities/web_modeling_editor/frontend`, follow the conventions upstream in `BESSER_WME_standalone`:
+- TypeScript should rarely appear in this repository. If you must edit the frontend submodule under `besser/utilities/web_modeling_editor/frontend`, follow the conventions upstream in `BESSER-WEB-MODELING-EDITOR`:
   - Enable strict compiler options.
   - Prefer `interface` for object shapes, `const` for immutable bindings, and explicit return types.
   - Run the frontend toolchain in that submodule (`npm install`, `npm test`) and keep linting/formatting consistent with its configuration.

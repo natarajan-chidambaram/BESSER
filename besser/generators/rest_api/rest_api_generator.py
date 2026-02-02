@@ -2,6 +2,7 @@ import os
 from jinja2 import Environment, FileSystemLoader
 from besser.BUML.metamodel.structural import DomainModel
 from besser.generators import GeneratorInterface
+from besser.generators.structural_utils import get_foreign_keys
 from besser.generators.pydantic_classes import PydanticGenerator
 
 class RESTAPIGenerator(GeneratorInterface):
@@ -39,48 +40,17 @@ class RESTAPIGenerator(GeneratorInterface):
         self.nested_creations = nested_creations
         self.port = port
 
-    def get_foreign_keys(self):
-        """
-        Returns a dictionary with the association names as keys and the class names that should hold the foreign
-        keys as values. This is used to determine which class owns the FK in relationships.
-        """
-        fkeys = dict()
-
-        for association in self.model.associations:
-            ends = list(association.ends)  # Convert set to list
-
-            # One-to-one
-            if ends[0].multiplicity.max == 1 and ends[1].multiplicity.max == 1:
-                if ends[0].multiplicity.min > 0 and ends[1].multiplicity.min == 0:
-                    # ends[0] is mandatory, FK should be in ends[1].type
-                    fkeys[association.name] = [ends[1].type.name, ends[0].name]
-                elif ends[1].multiplicity.min > 0 and ends[0].multiplicity.min == 0:
-                    # ends[1] is mandatory, FK should be in ends[0].type
-                    fkeys[association.name] = [ends[0].type.name, ends[1].name]
-                else:
-                    # Both mandatory or both optional, default to ends[0]
-                    fkeys[association.name] = [ends[0].type.name, ends[1].name]
-
-            # Many to one
-            elif ends[0].multiplicity.max > 1 and ends[1].multiplicity.max <= 1:
-                fkeys[association.name] = [ends[0].type.name, ends[1].name]
-
-            elif ends[0].multiplicity.max <= 1 and ends[1].multiplicity.max > 1:
-                fkeys[association.name] = [ends[1].type.name, ends[0].name]
-
-        return fkeys
-
     def generate_requirements(self):
         """
         Generates requirements.txt file with necessary dependencies
         """
         requirements = [
-            "fastapi>=0.68.0",
+            "fastapi>=0.103.0",
             "uvicorn>=0.15.0",
-            "pydantic>=1.8.0",
-            "typing-extensions>=4.0.0",
-            "sqlalchemy>=1.4.0",
-            "python-multipart>=0.0.5"
+            "pydantic>=2.0.0",
+            "typing-extensions>=4.6.0",
+            "sqlalchemy>=2.0.0",
+            "python-multipart>=0.0.6"
         ]
         
         file_path = self.build_generation_path(file_name="requirements.txt")
@@ -115,14 +85,14 @@ class RESTAPIGenerator(GeneratorInterface):
                           trim_blocks=True, lstrip_blocks=True, extensions=['jinja2.ext.do'])
             env.filters['clean_method_name'] = clean_method_name
             template = env.get_template('backend_fast_api_template.py.j2')
-            with open(file_path, mode="w") as f:
+            with open(file_path, mode="w", encoding="utf-8") as f:
                 generated_code = template.render(
                     name=self.model.name,
                     classes=self.model.classes_sorted_by_inheritance(),
                     http_methods=self.http_methods,
                     nested_creations=self.nested_creations,
                     port=self.port,
-                    fkeys=self.get_foreign_keys()
+                    fkeys=get_foreign_keys(self.model)
                 )
                 f.write(generated_code)
             print("Code generated in the location: " + file_path)
@@ -137,8 +107,10 @@ class RESTAPIGenerator(GeneratorInterface):
             env = Environment(loader=FileSystemLoader(templates_path),
                           trim_blocks=True, lstrip_blocks=True, extensions=['jinja2.ext.do'])
             template = env.get_template('fast_api_template.py.j2')
-            with open(file_path, mode="w") as f:
-                generated_code = template.render(classes=self.model.classes_sorted_by_inheritance(),
-                                             http_methods=self.http_methods)
+            with open(file_path, mode="w", encoding="utf-8") as f:
+                generated_code = template.render(
+                    classes=self.model.classes_sorted_by_inheritance(),
+                    http_methods=self.http_methods
+                )
                 f.write(generated_code)
             print("Code generated in the location: " + file_path)

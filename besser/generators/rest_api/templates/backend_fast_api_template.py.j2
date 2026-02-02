@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 ############################################
 
 def init_db():
-    SQLALCHEMY_DATABASE_URL = "sqlite:///./{{name}}.db"
+    SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/{{name}}.db")
+    # Ensure local SQLite directory exists (safe no-op for other DBs)
+    os.makedirs("data", exist_ok=True)
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, 
         connect_args={"check_same_thread": False},
@@ -659,6 +661,25 @@ async def bulk_create_{{ class.name | lower}}(items: list[{{ class.name }}Create
             {% endif -%}
             {% endfor -%}
             {%- endif %}
+            {# Validate inherited mandatory relationships #}
+            {% for parent in class.parents() %}
+            {% for association in parent.associations %}
+                {% if association.ends|length == 2 %}
+                    {% set plns = namespace(end1=None, end2=None) %}
+                    {% for end in association.ends %}
+                        {% set plns.end1 = end if end.type.name == parent.name else plns.end1 %}
+                        {% set plns.end2 = end if end.type.name != parent.name else plns.end2 %}
+                    {% endfor %}
+                    {%- if (plns.end1.multiplicity.max == 1 or plns.end1.multiplicity.max > 1) and plns.end2.multiplicity.max == 1 -%}
+                        {%- set parent_has_fk = (fkeys.get(association.name, [''])[0] == parent.name) -%}
+                        {% if parent_has_fk and plns.end2.multiplicity.min == 1 %}
+            if not item_data.{{plns.end2.name}}:
+                raise ValueError("{{plns.end2.type.name}} ID is required")
+                        {% endif -%}
+                    {%- endif -%}
+                {% endif %}
+            {% endfor %}
+            {% endfor %}
             
             {# Collect all constructor arguments for bulk create #}
             {% set ns_bulk_args = namespace(args=[]) %}
@@ -686,6 +707,29 @@ async def bulk_create_{{ class.name | lower}}(items: list[{{ class.name }}Create
             {% endif -%}
             {% endfor %}
             {% endif %}
+            {# Include parent FKs for inherited classes #}
+            {% for parent in class.parents() %}
+            {% for association in parent.associations %}
+                {% if association.ends|length == 2 %}
+                    {% set plns = namespace(end1=None, end2=None) %}
+                    {% for end in association.ends %}
+                        {% set plns.end1 = end if end.type.name == parent.name else plns.end1 %}
+                        {% set plns.end2 = end if end.type.name != parent.name else plns.end2 %}
+                    {% endfor %}
+                    {%- if plns.end1.multiplicity.max == 1 and plns.end2.multiplicity.max == 1 -%}
+                        {%- set parent_has_fk = (fkeys.get(association.name, [''])[0] == parent.name) -%}
+                        {% if parent_has_fk %}
+            {% do ns_bulk_args.args.append(plns.end2.name ~ '_id=item_data.' ~ plns.end2.name) %}
+                        {% endif -%}
+                    {%- elif plns.end1.multiplicity.max > 1 and plns.end2.multiplicity.max == 1 -%}
+                        {%- set parent_has_fk = (fkeys.get(association.name, [''])[0] == parent.name) -%}
+                        {% if parent_has_fk %}
+            {% do ns_bulk_args.args.append(plns.end2.name ~ '_id=item_data.' ~ plns.end2.name) %}
+                        {% endif -%}
+                    {%- endif -%}
+                {% endif %}
+            {% endfor %}
+            {% endfor %}
             db_{{ class.name | lower}} = {{ class.name }}(
                 {% for arg in ns_bulk_args.args %}
                 {{ arg }}{% if not loop.last %},{% endif %}
