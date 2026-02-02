@@ -5,6 +5,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+{% if agent_model %}
+        VITE_AGENT_URL: ws://localhost:8765
+{% endif %}
     ports:
       - "3000:3000"
     depends_on:
@@ -13,9 +18,9 @@ services:
       - agent
 {% endif %}
     environment:
-      - REACT_APP_API_URL=http://backend:8000
+      - VITE_API_URL=http://localhost:8000
 {% if agent_model %}
-      - REACT_APP_AGENT_URL=ws://localhost:8765
+      - VITE_AGENT_URL=ws://localhost:8765
 {% endif %}
 
   backend:
@@ -24,6 +29,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/{{ name }}.db
     volumes:
       - sqlite_data:/app/data
 {% if agent_model %}
