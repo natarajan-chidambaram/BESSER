@@ -2,7 +2,7 @@ import os
 from jinja2 import Environment, FileSystemLoader
 from besser.BUML.metamodel.structural import DomainModel, AssociationClass
 from besser.generators import GeneratorInterface
-from besser.utilities import sort_by_timestamp
+from besser.utilities.utils import sort_by_timestamp
 from besser.generators.structural_utils import get_foreign_keys
 
 class SQLAlchemyGenerator(GeneratorInterface):

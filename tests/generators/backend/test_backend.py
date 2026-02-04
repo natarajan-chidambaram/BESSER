@@ -3,7 +3,7 @@ import pytest
 from besser.generators.backend import BackendGenerator
 from besser.BUML.metamodel.structural import (
     DomainModel, Class, Property, IntegerType, StringType, FloatType, DateTimeType,
-    BinaryAssociation, Multiplicity
+    BinaryAssociation, Multiplicity, Generalization
 )
 
 
@@ -363,3 +363,82 @@ def test_pydantic_formatting(relationship_model, tmpdir):
     assert any("sensors" in line for line in field_lines), "sensors field not found"
     # At least one line should contain "p_asset"
     assert any("p_asset" in line for line in field_lines), "p_asset field not found"
+
+
+def test_rest_api_inherited_constructor_args(tmpdir):
+    """
+    Ensure REST API creation endpoints include constructor arguments
+    from all ancestor classes (A <- B <- C), including inherited FKs.
+    """
+    class_a = Class(name="A", attributes={
+        Property(name="a_attr", type=StringType),
+    })
+    class_b = Class(name="B", attributes={
+        Property(name="b_attr", type=IntegerType),
+    })
+    class_c = Class(name="C", attributes={
+        Property(name="c_attr", type=StringType),
+    })
+    ref = Class(name="Ref", attributes={
+        Property(name="label", type=StringType),
+    })
+
+    # A <- B <- C inheritance chain
+    Generalization(general=class_a, specific=class_b)
+    Generalization(general=class_b, specific=class_c)
+
+    # A has a mandatory many-to-one association to Ref (FK on A)
+    a_ref = BinaryAssociation(
+        name="a_ref",
+        ends={
+            Property(name="as", type=class_a, multiplicity=Multiplicity(0, "*")),
+            Property(name="ref", type=ref, multiplicity=Multiplicity(1, 1)),
+        },
+    )
+
+    model = DomainModel(
+        name="InheritanceRestApiTest",
+        types={class_a, class_b, class_c, ref},
+        associations={a_ref},
+    )
+
+    output_dir = tmpdir.mkdir("output_inheritance")
+    generator = BackendGenerator(model=model, output_dir=str(output_dir))
+    generator.generate()
+
+    api_file = os.path.join(str(output_dir), "main_api.py")
+    pydantic_file = os.path.join(str(output_dir), "pydantic_classes.py")
+    sqlalchemy_file = os.path.join(str(output_dir), "sql_alchemy.py")
+    with open(api_file, "r", encoding="utf-8") as f:
+        api_code = f.read()
+    with open(pydantic_file, "r", encoding="utf-8") as f:
+        pydantic_code = f.read()
+    with open(sqlalchemy_file, "r", encoding="utf-8") as f:
+        sqlalchemy_code = f.read()
+
+    # Direct create should include all ancestor attributes
+    assert "a_attr=c_data.a_attr" in api_code
+    assert "b_attr=c_data.b_attr" in api_code
+    assert "c_attr=c_data.c_attr" in api_code
+    # Inherited FK from A should be included in constructor args
+    assert "ref_id=c_data.ref" in api_code
+
+    # Bulk create should include all ancestor attributes too
+    assert "a_attr=item_data.a_attr" in api_code
+    assert "b_attr=item_data.b_attr" in api_code
+    assert "c_attr=item_data.c_attr" in api_code
+    assert "ref_id=item_data.ref" in api_code
+
+    # Pydantic backend classes should preserve deep inheritance
+    assert "class ACreate(BaseModel):" in pydantic_code
+    assert "class BCreate(ACreate):" in pydantic_code
+    assert "class CCreate(BCreate):" in pydantic_code
+    assert "a_attr: str" in pydantic_code
+    assert "b_attr: int" in pydantic_code
+    assert "c_attr: str" in pydantic_code
+
+    # SQLAlchemy classes should preserve deep inheritance
+    assert "class A(" in sqlalchemy_code
+    assert "class B(" in sqlalchemy_code
+    assert "class C(" in sqlalchemy_code
+    assert "class C(B):" in sqlalchemy_code

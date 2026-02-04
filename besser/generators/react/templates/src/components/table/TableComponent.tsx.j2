@@ -25,6 +25,8 @@ interface TableOptions {
   showPagination?: boolean;
   rowsPerPage?: number;
   columns?: Array<{ field: string; label?: string; type?: string; column_type?: string; path?: string } | string>;
+  formColumns?: Array<{ field: string; label?: string; type?: string; column_type?: string; path?: string; lookup_field?: string; lookupField?: string } | string>;
+  form_columns?: Array<{ field: string; label?: string; type?: string; column_type?: string; path?: string; lookup_field?: string; lookupField?: string } | string>;
 }
 
 interface Props {
@@ -140,7 +142,40 @@ export const TableComponent: React.FC<Props> = ({
     showPagination: options?.showPagination ?? true,
     rowsPerPage: options?.rowsPerPage ?? 5,
     columns: options?.columns ?? [],
+    formColumns: (options as any)?.formColumns ?? (options as any)?.form_columns ?? [],
     actionButtons: (options as any)?.actionButtons ?? (options as any)?.["action-buttons"] ?? false,
+  };
+
+  const normalizeOptionColumns = (rawColumns: any[]): TableColumn[] => {
+    if (!Array.isArray(rawColumns) || rawColumns.length === 0) {
+      return [];
+    }
+    return rawColumns
+      .filter((col): col is { field: string; label?: string; type?: string; column_type?: string; path?: string; entity?: string; options?: string[]; required?: boolean; lookup_field?: string; lookupField?: string } | string => Boolean(col))
+      .map((col) => {
+        if (typeof col === "string") {
+          return { field: col, label: humanize(col), type: "string" };
+        }
+        const actualField = col.column_type === "lookup" && col.path
+          ? col.path
+          : col.field;
+        const relationshipKey = col.column_type === "lookup" && col.path
+          ? col.path
+          : undefined;
+        const lookupField = (col as any).lookup_field ?? (col as any).lookupField ?? col.field;
+        return {
+          field: actualField,
+          label: humanize(col.label || col.field),
+          type: col.type || "string",
+          columnType: col.column_type,
+          path: col.path,
+          entity: col.entity,
+          options: col.options,
+          required: col.required ?? false,
+          lookupField: col.column_type === "lookup" ? lookupField : undefined,
+          relationshipKey: relationshipKey,
+        };
+      });
   };
 
   const normalizedRows = useMemo(() => {
@@ -159,36 +194,7 @@ export const TableComponent: React.FC<Props> = ({
 
   const columns: TableColumn[] = useMemo(() => {
     if (resolvedOptions.columns.length > 0) {
-      return resolvedOptions.columns
-        .filter((col): col is { field: string; label?: string; type?: string; column_type?: string; path?: string; entity?: string; options?: string[]; required?: boolean } | string => Boolean(col))
-        .map((col) => {
-          if (typeof col === "string") {
-            return { field: col, label: humanize(col), type: "string" };
-          }
-          // For lookup columns, use path as the actual field to read
-          const actualField = col.column_type === "lookup" && col.path
-            ? col.path  // Use path for lookup (e.g., "customer")
-            : col.field;
-          
-          // The relationship key in the API response is simply the path name
-          // Example: "customer"
-          const relationshipKey = col.column_type === "lookup" && col.path
-            ? col.path
-            : undefined;
-          
-          return {
-            field: actualField,
-            label: humanize(col.label || col.field),
-            type: col.type || "string",
-            columnType: col.column_type,
-            path: col.path,
-            entity: col.entity,
-            options: col.options,
-            required: col.required ?? false,
-            lookupField: col.column_type === "lookup" ? col.field : undefined,  // Store the nested field (e.g., "name")
-            relationshipKey: relationshipKey,  // API relationship key (e.g., "customer")
-          };
-        });
+      return normalizeOptionColumns(resolvedOptions.columns);
     }
 
     if (normalizedRows.length === 0) {
@@ -210,6 +216,11 @@ export const TableComponent: React.FC<Props> = ({
       type: "string",
     }));
   }, [normalizedRows, resolvedOptions.columns]);
+
+  const formColumns: TableColumn[] = useMemo(() => {
+    const normalizedFormColumns = normalizeOptionColumns(resolvedOptions.formColumns ?? []);
+    return normalizedFormColumns.length > 0 ? normalizedFormColumns : columns;
+  }, [columns, resolvedOptions.formColumns]);
 
   // Apply column filters
   const filteredRows = useMemo(() => {
@@ -421,12 +432,27 @@ export const TableComponent: React.FC<Props> = ({
     setCurrentPage(1);
   }, [pageSize, filteredRows.length]);
 
+  useEffect(() => {
+    if (!showModal) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showModal]);
+
   // Reset form values when modal opens
   useEffect(() => {
     if (showModal) {
       setValidationError("");
       const initialValues: Record<string, any> = {};
-      columns.forEach(col => {
+      formColumns.forEach(col => {
         if (modalMode === 'edit' && editRowData) {
           // For lookup columns in edit mode, use the FK ID
           if (col.columnType === 'lookup') {
@@ -468,7 +494,7 @@ export const TableComponent: React.FC<Props> = ({
         const options: Record<string, any[]> = {};
         const backendBase = import.meta.env.VITE_API_URL || "http://localhost:8000";
         
-        for (const col of columns) {
+        for (const col of formColumns) {
           if (col.columnType === 'lookup' && col.entity) {
             const endpoint = col.entity.toLowerCase();
             try {
@@ -489,7 +515,7 @@ export const TableComponent: React.FC<Props> = ({
 
       fetchLookupOptions();
     }
-  }, [showModal, columns, modalMode, editRowData]);
+  }, [showModal, formColumns, modalMode, editRowData]);
 
   const totalPages = resolvedOptions.showPagination
     ? Math.max(1, Math.ceil(sortedAndFilteredRows.length / pageSize))
@@ -595,7 +621,9 @@ export const TableComponent: React.FC<Props> = ({
       {/* Modal for Add/Edit Register */}
       {showModal && (
         createPortal(
-          <div style={{
+          <div
+            onClick={() => setShowModal(false)}
+            style={{
             position: "fixed",
             top: 0,
             left: 0,
@@ -606,8 +634,11 @@ export const TableComponent: React.FC<Props> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-          }}>
-            <div style={{
+          }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
               background: "#fff",
               borderRadius: "12px",
               boxShadow: "0 4px 24px rgba(30,41,59,0.18)",
@@ -616,7 +647,11 @@ export const TableComponent: React.FC<Props> = ({
               maxWidth: "90vw",
               width: "400px",
               position: "relative",
-            }}>
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+            >
               <h4 style={{ margin: 0, marginBottom: "18px", color: "#1e293b" }}>
                 {modalMode === 'edit' ? `Edit ${dataBinding?.entity || 'Register'}` : `Add ${dataBinding?.entity || 'Register'}`}
               </h4>
@@ -639,7 +674,7 @@ export const TableComponent: React.FC<Props> = ({
                   
                   // Validate required fields
                   const missingFields: string[] = [];
-                  columns.forEach(col => {
+                  formColumns.forEach(col => {
                     if (col.required) {
                       if (col.columnType === 'lookup') {
                         if (col.type === 'list') {
@@ -673,7 +708,7 @@ export const TableComponent: React.FC<Props> = ({
                   
                   // Process form values based on column types
                   const processedValues: Record<string, any> = {};
-                  columns.forEach(col => {
+                  formColumns.forEach(col => {
                     // For lookup columns, use the path as the API field name
                     if (col.columnType === 'lookup' && col.path) {
                       if (col.type === 'list') {
@@ -782,9 +817,23 @@ export const TableComponent: React.FC<Props> = ({
                     }
                   }
                 }}
-                style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                }}
               >
-                {columns.map(col => {
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  overflowY: "auto",
+                  maxHeight: "60vh",
+                  paddingRight: "4px",
+                }}>
+                {formColumns.map(col => {
                   // For lookup columns, render a select dropdown
                   if (col.columnType === 'lookup' && col.entity) {
                     const endpoint = col.entity.toLowerCase();
@@ -982,6 +1031,7 @@ export const TableComponent: React.FC<Props> = ({
                     </div>
                   );
                 })}
+                </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
                   <button
                     type="button"
@@ -1024,7 +1074,7 @@ export const TableComponent: React.FC<Props> = ({
                   cursor: "pointer",
                 }}
                 aria-label="Close"
-              >×</button>
+              >x</button>
             </div>
           </div>,
           document.body

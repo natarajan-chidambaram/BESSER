@@ -8,6 +8,7 @@ It leverages the existing ANTLR-based parser in besser/BUML/notations/ocl
 and traverses the parsed OCL expression tree similar to the B-OCL-Interpreter.
 """
 
+import re
 from typing import Optional, Dict, Any, List
 from besser.BUML.notations.ocl.BOCLLexer import BOCLLexer
 from besser.BUML.notations.ocl.BOCLParser import BOCLParser
@@ -36,7 +37,8 @@ def parse_ocl_constraint(constraint, domain_model) -> Optional[Dict[str, Any]]:
         
     Returns:
         A dict with keys: property, operator, value, python_operator
-        or None if the expression cannot be parsed for validation
+        or for compound expressions: property, python_expression, message.
+        Returns None if the expression cannot be parsed for validation.
     """
     try:
         # Parse using the ANTLR OCL parser - similar to OCLParserWrapper.parse()
@@ -178,6 +180,60 @@ def _extract_from_operation(op_exp: OperationCallExpression) -> Optional[Dict[st
     }
 
 
+def _extract_expression_body(expression: str) -> str:
+    """
+    Extract the OCL expression body from a full constraint string.
+    """
+    expression = expression.strip()
+    match = re.search(
+        r"context\s+\w+\s+inv(?:\s+\w+)?\s*:\s*(.+)",
+        expression,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+    if match:
+        return match.group(1).strip()
+    return expression
+
+
+def _apply_outside_quotes(text: str, transform) -> str:
+    """
+    Apply a transformation function only to text outside single-quoted strings.
+    """
+    parts = text.split("'")
+    for idx in range(0, len(parts), 2):
+        parts[idx] = transform(parts[idx])
+    return "'".join(parts)
+
+
+def _replace_outside_quotes(text: str, pattern: str, repl: str) -> str:
+    """
+    Regex replace outside single-quoted strings.
+    """
+    return _apply_outside_quotes(text, lambda part: re.sub(pattern, repl, part))
+
+
+def _collapse_whitespace_outside_quotes(text: str) -> str:
+    """
+    Collapse consecutive whitespace outside single-quoted strings.
+    """
+    return _apply_outside_quotes(text, lambda part: re.sub(r"\s+", " ", part)).strip()
+
+
+def _normalize_ocl_expression(expression: str, property_name: str) -> str:
+    """
+    Normalize an OCL expression into a Python expression for a single property.
+    """
+    normalized = expression
+    normalized = _replace_outside_quotes(normalized, r"<>", "!=")
+    normalized = _replace_outside_quotes(normalized, r"(?<![<>=!])=(?!=)", "==")
+    normalized = _replace_outside_quotes(
+        normalized,
+        rf"\bself\.{re.escape(property_name)}\b",
+        "v"
+    )
+    return _collapse_whitespace_outside_quotes(normalized)
+
+
 def _fallback_parse(expression: str) -> Optional[Dict[str, Any]]:
     """
     Fallback regex-based parser for simple OCL constraint expressions.
@@ -188,20 +244,47 @@ def _fallback_parse(expression: str) -> Optional[Dict[str, Any]]:
         
     Returns:
         A dict with keys: property, operator, value, python_operator
-        or None if the expression cannot be parsed
+        or for compound expressions: property, python_expression, message.
+        Returns None if the expression cannot be parsed.
     """
-    import re
-    
-    # Pattern to match: context <Class> inv [name]: self.<property> <operator> <value>
-    pattern = r"context\s+\w+\s+inv(?:\s+\w+)?:\s*self\.(\w+)\s*(>=|<=|<>|>|<|=)\s*(.+)"
-    
-    match = re.search(pattern, expression.strip())
-    if not match:
+    # Extract the core OCL expression body (after "inv:")
+    expression_body = _extract_expression_body(expression)
+    if not expression_body:
         return None
     
-    property_name = match.group(1)
-    operator = match.group(2)
-    value_str = match.group(3).strip()
+    # Identify properties referenced in the expression
+    properties = re.findall(r"\bself\.(\w+)\b", expression_body)
+    if not properties:
+        return None
+    
+    unique_properties = set(properties)
+    if len(unique_properties) != 1:
+        # Only support single-property constraints for field validators
+        return None
+    
+    property_name = unique_properties.pop()
+    multiple_references = len(properties) > 1
+    
+    # Pattern to match: self.<property> <operator> <value>
+    simple_pattern = rf"self\.{re.escape(property_name)}\s*(>=|<=|<>|>|<|=)\s*(.+)"
+    match = re.fullmatch(simple_pattern, expression_body.strip())
+    if not match or multiple_references:
+        # Handle compound expressions like "self.age > 10 and self.age < 20"
+        python_expression = _normalize_ocl_expression(expression_body, property_name)
+        message_expression = _replace_outside_quotes(
+            python_expression,
+            r"\bv\b",
+            ""
+        )
+        message_expression = _collapse_whitespace_outside_quotes(message_expression)
+        return {
+            'property': property_name,
+            'python_expression': python_expression,
+            'message': f"{property_name} must be {message_expression}"
+        }
+    
+    operator = match.group(1)
+    value_str = match.group(2).strip()
     
     # Map OCL operators to Python operators
     operator_map = {
