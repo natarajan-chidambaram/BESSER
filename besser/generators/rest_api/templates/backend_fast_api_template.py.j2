@@ -213,6 +213,7 @@ def get_statistics(database: Session = Depends(get_db)):
 #
 ############################################
 {% set ns = namespace(end_name_one=[], end_name_multiple=[], one_to_many=[]) %}
+{% set all_parents = class.all_parents() | sort(attribute='name') %}
 {% for association in class.associations %}
     {% if association.ends|length == 2 and association.name not in ns.processed_associations %}
         {% set lns = namespace(end1=None, end2=None) %}
@@ -237,7 +238,7 @@ def get_statistics(database: Session = Depends(get_db)):
     {% endif %}
 {% endfor %}
 {# Include inherited associations from parent classes #}
-{% for parent in class.parents() %}
+{% for parent in all_parents %}
 {% for association in parent.associations %}
     {% if association.ends|length == 2 %}
         {% set plns = namespace(end1=None, end2=None) %}
@@ -459,7 +460,7 @@ async def create_{{ class.name | lower}}({{ class.name | lower}}_data: {{ class.
     {% endfor -%}
     {%- endif %}
     {# Validate inherited mandatory relationships #}
-    {% for parent in class.parents() %}
+    {% for parent in all_parents %}
     {% for association in parent.associations %}
         {% if association.ends|length == 2 %}
             {% set plns = namespace(end1=None, end2=None) %}
@@ -502,7 +503,7 @@ async def create_{{ class.name | lower}}({{ class.name | lower}}_data: {{ class.
 
     {# Collect all constructor arguments #}
     {% set ns_args = namespace(args=[]) %}
-    {% for parent in class.parents() %}
+    {% for parent in all_parents %}
     {% for attrparent in parent.attributes %}
     {% if attrparent.type.__class__.__name__ == 'Enumeration' %}
     {% do ns_args.args.append(attrparent.name ~ '=' ~ class.name|lower ~ '_data.' ~ attrparent.name ~ '.value') %}
@@ -527,7 +528,7 @@ async def create_{{ class.name | lower}}({{ class.name | lower}}_data: {{ class.
     {% endfor %}
     {% endif %}
     {# Include parent FKs for inherited classes #}
-    {% for parent in class.parents() %}
+    {% for parent in all_parents %}
     {% for association in parent.associations %}
         {% if association.ends|length == 2 %}
             {% set plns = namespace(end1=None, end2=None) %}
@@ -662,7 +663,7 @@ async def bulk_create_{{ class.name | lower}}(items: list[{{ class.name }}Create
             {% endfor -%}
             {%- endif %}
             {# Validate inherited mandatory relationships #}
-            {% for parent in class.parents() %}
+            {% for parent in all_parents %}
             {% for association in parent.associations %}
                 {% if association.ends|length == 2 %}
                     {% set plns = namespace(end1=None, end2=None) %}
@@ -683,7 +684,7 @@ async def bulk_create_{{ class.name | lower}}(items: list[{{ class.name }}Create
             
             {# Collect all constructor arguments for bulk create #}
             {% set ns_bulk_args = namespace(args=[]) %}
-            {% for parent in class.parents() %}
+            {% for parent in all_parents %}
             {% for attrparent in parent.attributes %}
             {% if attrparent.type.__class__.__name__ == 'Enumeration' %}
             {% do ns_bulk_args.args.append(attrparent.name ~ '=item_data.' ~ attrparent.name ~ '.value') %}
@@ -708,7 +709,7 @@ async def bulk_create_{{ class.name | lower}}(items: list[{{ class.name }}Create
             {% endfor %}
             {% endif %}
             {# Include parent FKs for inherited classes #}
-            {% for parent in class.parents() %}
+            {% for parent in all_parents %}
             {% for association in parent.associations %}
                 {% if association.ends|length == 2 %}
                     {% set plns = namespace(end1=None, end2=None) %}

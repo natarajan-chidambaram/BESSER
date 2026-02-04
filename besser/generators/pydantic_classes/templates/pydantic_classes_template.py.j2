@@ -1,5 +1,5 @@
 from datetime import datetime, date, time
-from typing import List, Optional, Union, Set
+from typing import Any, List, Optional, Union, Set
 from enum import Enum
 from pydantic import BaseModel, field_validator
 
@@ -44,7 +44,7 @@ class {{ class.name }}{% if backend %}Create{% endif %}{% if class.parents() %}(
             {%- set ns.id_found = true %}
         {%- endif %}
         {%- if attribute.name not in inherited_attr_names %}
-    {{ attribute.name }}: {{ attribute.type.name }}{% if attribute.is_id %}  # the id{% endif %}
+    {{ attribute.name }}: {{ 'Any' if attribute.type.name == 'any' else attribute.type.name }}{% if attribute.is_id %}  # the id{% endif %}
     {% set ns.has_field = true %}
 
         {% endif %}
@@ -114,6 +114,14 @@ class {{ class.name }}{% if backend %}Create{% endif %}{% if class.parents() %}(
     {{ ns.end2.name }}: Optional[int] = None  # 1:1 Relationship (optional)
     {% set ns.has_field = true %}
                             {% endif %}
+                        {%- else %}
+                            {%- if ns.end2.multiplicity.min > 0 %}
+    {{ ns.end2.name }}: int  # 1:1 Relationship (mandatory)
+    {% set ns.has_field = true %}
+                            {% else %}
+    {{ ns.end2.name }}: Optional[int] = None  # 1:1 Relationship (optional)
+    {% set ns.has_field = true %}
+                            {% endif %}
                         {%- endif %}
                     {% else %}
     {{ ns.end2.name }}: "{{ ns.end2.type.name }}"  # 1:1 Relationship
@@ -134,8 +142,13 @@ class {{ class.name }}{% if backend %}Create{% endif %}{% if class.parents() %}(
     @classmethod
     def validate_{{ constraint.property }}_{{ loop.index }}(cls, v):
         """OCL Constraint: {{ constraint.constraint_name }}"""
+        {% if constraint.python_expression is defined %}
+        if not ({{ constraint.python_expression }}):
+            raise ValueError('{{ constraint.message }}')
+        {% else %}
         if not (v {{ constraint.python_operator }} {{ constraint.value_repr }}):
             raise ValueError('{{ constraint.property }} must be {{ constraint.python_operator }} {{ constraint.value_repr }}')
+        {% endif %}
         return v
     {%- endfor %}
     {%- endif %}

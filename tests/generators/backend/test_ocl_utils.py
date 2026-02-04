@@ -204,6 +204,23 @@ class TestFallbackParse:
         result = _fallback_parse("context Player inv: age > 10")
         assert result is None
 
+    def test_parse_compound_and_same_property(self):
+        """Test parsing compound constraint with the same property."""
+        result = _fallback_parse(
+            "context Publication inv: self.year > 1500 and self.year < 2100"
+        )
+        assert result is not None
+        assert result['property'] == 'year'
+        assert result['python_expression'] == 'v > 1500 and v < 2100'
+        assert result['message'] == 'year must be > 1500 and < 2100'
+
+    def test_compound_multiple_properties_returns_none(self):
+        """Test that compound constraints with multiple properties are skipped."""
+        result = _fallback_parse(
+            "context Player inv: self.age > 10 and self.jerseyNumber < 99"
+        )
+        assert result is None
+
 
 # ============================================================================
 # Tests for parse_ocl_constraint

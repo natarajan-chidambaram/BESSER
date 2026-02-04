@@ -42,6 +42,7 @@ from besser.BUML.metamodel.gui.events_actions import (
     Update,
 )
 from besser.BUML.metamodel.structural import DomainModel, Enumeration
+from besser.utilities import sort_by_timestamp
 
 
 class GuiSerializationMixin:
@@ -554,6 +555,69 @@ class GuiSerializationMixin:
 
             if columns:
                 node["chart"]["columns"] = columns
+
+            # Build complete form columns from domain metadata (all attributes + associations)
+            form_columns = []
+            binding = getattr(element, "data_binding", None)
+            domain_concept = getattr(binding, "domain_concept", None) if binding else None
+            if domain_concept:
+                attributes = list(domain_concept.all_attributes())
+                attributes = sort_by_timestamp(attributes) if attributes else []
+                for attr in attributes:
+                    field_type = getattr(attr, "type", None)
+                    column_dict = {
+                        "column_type": "field",
+                        "field": attr.name,
+                        "label": attr.name,
+                        "type": "str",
+                        "required": False,
+                    }
+
+                    if isinstance(field_type, Enumeration):
+                        column_dict["type"] = "enum"
+                        column_dict["options"] = sorted([literal.name for literal in field_type.literals])
+                    elif field_type and getattr(field_type, "name", None):
+                        column_dict["type"] = field_type.name
+
+                    multiplicity = getattr(attr, "multiplicity", None)
+                    if multiplicity and getattr(multiplicity, "min", 0) > 0:
+                        column_dict["required"] = True
+
+                    form_columns.append(column_dict)
+
+                ends = list(domain_concept.all_association_ends())
+                ends = sort_by_timestamp(ends) if ends else []
+                for end in ends:
+                    if hasattr(end, "is_navigable") and not end.is_navigable:
+                        continue
+
+                    target = getattr(end, "type", None)
+                    target_attrs = []
+                    if target and hasattr(target, "all_attributes"):
+                        target_attrs = sort_by_timestamp(list(target.all_attributes()))
+                    lookup_field = target_attrs[0].name if target_attrs else ""
+
+                    max_mult = getattr(getattr(end, "multiplicity", None), "max", None)
+                    is_list = max_mult == "*" or (isinstance(max_mult, int) and max_mult > 1)
+
+                    column_dict = {
+                        "column_type": "lookup",
+                        "path": end.name,
+                        "field": end.name,
+                        "lookup_field": lookup_field,
+                        "entity": getattr(target, "name", "") if target else "",
+                        "type": "list" if is_list else "str",
+                        "required": False,
+                    }
+
+                    multiplicity = getattr(end, "multiplicity", None)
+                    if multiplicity and getattr(multiplicity, "min", 0) > 0:
+                        column_dict["required"] = True
+
+                    form_columns.append(column_dict)
+
+            if form_columns:
+                node["chart"]["formColumns"] = form_columns
             
             # Remove raw GrapesJS columns from attributes - we use the processed columns in chart
             if "attributes" in node and isinstance(node["attributes"], dict) and "columns" in node["attributes"]:
